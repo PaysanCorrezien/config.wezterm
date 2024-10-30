@@ -1,8 +1,12 @@
-# 🚀 WezTerm Power Configuration
+# 🚀 WezTerm Configuration
 
 A comprehensive WezTerm configuration that transforms your terminal into a powerful workspace management system with vim-style navigation. This setup eliminates the need for tmux while providing advanced features for session management, workspace organization, and seamless navigation.
-Most of the configuration work cross platform, but some features are only available on Linux.(like the preset portal to my notes, nix configs)
+
 Use it as reference for your own configuration and feel free to take any part of it.
+
+## 🎯 Overview
+
+This configuration combines multiple custom plugins to create a cohesive terminal workspace environment. While designed primarily for Linux (where it unlocks its full potential with features like preset portals to notes and nix configs), most features work cross-platform, making it adaptable for various workflows.
 
 ## ✨ Features
 
