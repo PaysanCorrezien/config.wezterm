@@ -1,0 +1,417 @@
+-- keymap.lua
+local wez = require("wezterm")
+local act = wez.action
+
+-- Plugin imports
+local workspace_switcher = wez.plugin.require("https://github.com/MLFlexer/smart_workspace_switcher.wezterm")
+local resurrect = wez.plugin.require("https://github.com/MLFlexer/resurrect.wezterm")
+
+local hostname = wez.hostname()
+local username = os.getenv("USER") or os.getenv("USERNAME")
+
+-- Declare variables before if block to maintain scope
+local previous_workspace
+local semantic_zones
+local marks
+local portal
+local ssh
+local workspace_manager
+
+if username == "dylan" and (hostname == "workstation" or hostname == "lenovo") then
+	-- Set package path for local modules
+	package.path = package.path .. ";/home/dylan/repo/?.wezterm/init.lua"
+	-- Local module imports
+	previous_workspace = require("previous_workspace")
+	semantic_zones = require("semantic_zones")
+	marks = require("marks")
+	portal = require("portal")
+	ssh = require("ssh_menu")
+	workspace_manager = require("workspace_manager")
+else
+	-- GitHub imports
+	previous_workspace = wez.plugin.require("https://github.com/paysancorrezien/previous_workspace.wezterm")
+	semantic_zones = wez.plugin.require("https://github.com/paysancorrezien/semantic_zones.wezterm")
+	marks = wez.plugin.require("https://github.com/paysancorrezien/marks.wezterm")
+	portal = wez.plugin.require("https://github.com/paysancorrezien/portal.wezterm")
+	ssh = wez.plugin.require("https://github.com/paysancorrezien/ssh_menu.wezterm")
+	workspace_manager = wez.plugin.require("https://github.com/paysancorrezien/workspace_manager.wezterm")
+end
+
+-- Create module table
+local M = {}
+
+-- Define keybindings
+M.keys = {
+	{
+		key = "Tab",
+		mods = "CTRL",
+		action = act.ActivateTabRelative(1),
+	},
+	{
+		key = "Tab",
+		mods = "CTRL|SHIFT",
+		action = act.ActivateTabRelative(-1),
+	},
+
+	-- Clipboard operations
+	{
+		key = "c",
+		mods = "CTRL|SHIFT",
+		action = act.CopyTo("Clipboard"),
+	},
+	{
+		key = "v",
+		mods = "CTRL|SHIFT",
+		action = act.PasteFrom("Clipboard"),
+	},
+	{
+		key = "v",
+		mods = "CTRL",
+		action = act.PasteFrom("Clipboard"),
+	},
+
+	-- System operations
+	{
+		key = "d",
+		mods = "CTRL|SHIFT",
+		action = act.ShowDebugOverlay,
+	},
+	{
+		key = "n",
+		mods = "CTRL|SHIFT",
+		action = act.SpawnWindow,
+	},
+	{
+		key = "p",
+		mods = "CTRL|SHIFT",
+		action = act.ActivateCommandPalette,
+	},
+	{
+		key = "r",
+		mods = "CTRL|SHIFT",
+		action = act.ReloadConfiguration,
+	},
+	{
+		key = "t",
+		mods = "CTRL|SHIFT",
+		action = act.SpawnTab("CurrentPaneDomain"),
+	},
+	{
+		key = "u",
+		mods = "CTRL|SHIFT",
+		action = act.CharSelect({
+			copy_on_select = true,
+			copy_to = "ClipboardAndPrimarySelection",
+		}),
+	},
+	{
+		key = "w",
+		mods = "CTRL|SHIFT",
+		action = act.CloseCurrentTab({ confirm = true }),
+	},
+
+	-- Scrolling
+	{
+		key = "PageUp",
+		mods = "NONE",
+		action = act.ScrollByPage(-1),
+	},
+	{
+		key = "PageDown",
+		mods = "NONE",
+		action = act.ScrollByPage(1),
+	},
+
+	-- Selection and paste
+	{
+		key = "Insert",
+		mods = "CTRL|SHIFT",
+		action = act.PasteFrom("PrimarySelection"),
+	},
+
+	-- Split operations
+	{
+		key = "h",
+		mods = "LEADER",
+		action = act.ActivatePaneDirection("Left"),
+	},
+	{
+		key = "j",
+		mods = "LEADER",
+		action = act.ActivatePaneDirection("Down"),
+	},
+	{
+		key = "k",
+		mods = "LEADER",
+		action = act.ActivatePaneDirection("Up"),
+	},
+	{
+		key = "l",
+		mods = "LEADER",
+		action = act.ActivatePaneDirection("Right"),
+	},
+	{
+		key = '"',
+		mods = "CTRL|SHIFT",
+		action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }),
+	},
+	{
+		key = "%",
+		mods = "CTRL|SHIFT",
+		action = act.SplitVertical({ domain = "CurrentPaneDomain" }),
+	},
+	{
+		key = "s",
+		mods = "LEADER",
+		action = wez.action.SplitPane({
+			direction = "Right",
+		}),
+	},
+	{
+		key = "v",
+		mods = "LEADER",
+		action = wez.action.SplitPane({
+			direction = "Down",
+		}),
+	},
+
+	-- Search and copy mode
+	{
+		key = "x",
+		mods = "CTRL|SHIFT",
+		action = act.ActivateCopyMode,
+	},
+	{
+		key = "f",
+		mods = "CTRL|SHIFT",
+		action = act.Search("CurrentSelectionOrEmptyString"),
+	},
+
+	-- Pane size adjustments
+	{
+		key = "h",
+		mods = "CTRL|SHIFT",
+		action = act.AdjustPaneSize({ "Left", 10 }),
+	},
+	{
+		key = "j",
+		mods = "CTRL|SHIFT",
+		action = act.AdjustPaneSize({ "Down", 10 }),
+	},
+	{
+		key = "k",
+		mods = "CTRL|SHIFT",
+		action = act.AdjustPaneSize({ "Up", 10 }),
+	},
+	{
+		key = "l",
+		mods = "CTRL|SHIFT",
+		action = act.AdjustPaneSize({ "Right", 10 }),
+	},
+
+	-- Number key passthrough
+	{
+		key = "1",
+		mods = "CTRL",
+		action = act.SendKey({ key = "1", mods = "CTRL" }),
+	},
+	{
+		key = "2",
+		mods = "CTRL",
+		action = act.SendKey({ key = "2", mods = "CTRL" }),
+	},
+	{
+		key = "3",
+		mods = "CTRL",
+		action = act.SendKey({ key = "3", mods = "CTRL" }),
+	},
+	{
+		key = "4",
+		mods = "CTRL",
+		action = act.SendKey({ key = "4", mods = "CTRL" }),
+	},
+	{
+		key = "5",
+		mods = "CTRL",
+		action = act.SendKey({ key = "5", mods = "CTRL" }),
+	},
+	{
+		key = "6",
+		mods = "CTRL",
+		action = act.SendKey({ key = "6", mods = "CTRL" }),
+	},
+	{
+		key = "7",
+		mods = "CTRL",
+		action = act.SendKey({ key = "7", mods = "CTRL" }),
+	},
+	{
+		key = "m",
+		mods = "CTRL",
+		action = act.SendKey({ key = "m", mods = "CTRL" }),
+	},
+
+	-- Semantic zone navigation
+	{
+		key = "o",
+		mods = "CTRL|SHIFT",
+		action = wez.action_callback(function(window, pane)
+			local output = semantic_zones.get_last_command_output(pane)
+			if output then
+				window:copy_to_clipboard(output)
+				window:toast_notification("WezTerm", "Last command output copied to clipboard", nil, 2000)
+			else
+				window:toast_notification("WezTerm", "No command output found", nil, 4000)
+			end
+		end),
+	},
+	{
+		key = ",",
+		mods = "CTRL",
+		action = wez.action_callback(function(window, pane)
+			return semantic_zones.select_output_zone(window, pane, "previous")
+		end),
+	},
+	{
+		key = ".",
+		mods = "CTRL",
+		action = wez.action_callback(function(window, pane)
+			return semantic_zones.select_output_zone(window, pane, "next")
+		end),
+	},
+
+	-- Portal teleport bindings
+	{
+		key = "N",
+		mods = "LEADER", -- Changed from ALT to LEADER
+		action = portal.teleport({
+			name = "Notes",
+			action = {
+				args = {
+					"zsh",
+					"-c",
+					"source ~/.zshrc && nvim -c \"lua require('telescope.builtin').find_files({cwd = '/home/dylan/Documents/Notes/', file_ignore_patterns = {'^%.git/'}, find_command = {'rg', '--files', '--type', 'md'}})\"",
+				},
+				cwd = "/home/dylan/Documents/Notes/",
+				env = { EDITOR = "nvim" },
+			},
+		}),
+	},
+	{
+		key = "n",
+		mods = "LEADER", -- Changed from CTRL|ALT to LEADER
+		action = portal.teleport({
+			name = "NixOs",
+			action = {
+				args = {
+					"zsh",
+					"-c",
+					"source ~/.zshrc && nvim -c \"lua require('telescope.builtin').find_files({cwd = '/home/dylan/.config/nix/', file_ignore_patterns = {'^%.git/'}})\"",
+				},
+				cwd = "/home/dylan/.config/nix/",
+			},
+		}),
+	},
+	{
+		key = ".",
+		mods = "LEADER", -- Changed from ALT to LEADER
+		action = portal.teleport({
+			name = "Music",
+			action = {
+				args = { "termusic" },
+				cwd = "/home/dylan/Musique/",
+			},
+		}),
+	},
+
+	-- Workspace and pane management
+	{
+		key = "F",
+		mods = "LEADER",
+		action = workspace_switcher.switch_workspace(),
+	},
+	{
+		key = "f",
+		mods = "LEADER",
+		action = workspace_manager.SwitchPanes(),
+	},
+	{
+		key = "x",
+		mods = "LEADER",
+		action = act.CloseCurrentPane({ confirm = true }),
+	},
+	{
+		key = "s",
+		mods = "SHIFT|LEADER",
+		action = wez.action_callback(function(window, pane)
+			resurrect.save_state(resurrect.workspace_state.get_workspace_state())
+		end),
+	},
+	{
+		key = "o",
+		mods = "LEADER",
+		action = wez.action_callback(function(window, pane)
+			resurrect.fuzzy_load(window, pane, function(id, label)
+				local type = string.match(id, "^([^/]+)")
+				id = string.match(id, "([^/]+)$")
+				id = string.match(id, "(.+)%..+$")
+				local state
+				if type == "workspace" then
+					state = resurrect.load_state(id, "workspace")
+					resurrect.workspace_state.restore_workspace(state, {
+						relative = true,
+						restore_text = true,
+						on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+					})
+				elseif type == "window" then
+					state = resurrect.load_state(id, "window")
+					resurrect.window_state.restore_window(window:mux_window(), state, {
+						relative = true,
+						restore_text = true,
+						on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+					})
+				end
+			end)
+		end),
+	},
+	{
+		key = "M",
+		mods = "LEADER",
+		action = wez.action_callback(function(window)
+			marks.AccessMarkFromMemory(window)
+		end),
+	},
+	{
+		key = "m",
+		mods = "LEADER",
+		action = wez.action_callback(function(window)
+			marks.WriteMarkToMemory(window)
+		end),
+	},
+
+	-- SSH menu (marked as not working)
+	{
+		key = "Z",
+		mods = "LEADER",
+		action = wez.action_callback(function(window, pane)
+			ssh.ssh_menu(window, pane)
+		end),
+	},
+
+	-- Previous workspace switcher
+	{
+		key = "b",
+		mods = "LEADER",
+		action = previous_workspace.switch_to_previous_workspace(),
+	},
+
+	-- Session state management
+	{
+		key = "S",
+		mods = "LEADER",
+		action = wez.action_callback(function(window, pane)
+			resurrect.save_state(resurrect.workspace_state.get_workspace_state())
+		end),
+	},
+}
+return M
