@@ -375,14 +375,14 @@ M.keys = {
 		end),
 	},
 	{
-		key = "M",
+		key = "m",
 		mods = "LEADER",
 		action = wez.action_callback(function(window)
 			marks.AccessMarkFromMemory(window)
 		end),
 	},
 	{
-		key = "m",
+		key = "M",
 		mods = "LEADER",
 		action = wez.action_callback(function(window)
 			marks.WriteMarkToMemory(window)
