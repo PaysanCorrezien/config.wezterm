@@ -8,7 +8,9 @@ local M = {
 	automatically_reload_config = true,
 	warn_about_missing_glyphs = false,
 	check_for_updates = false,
-	enable_wayland = true,
+	-- enable_wayland = true,
+	front_end = "WebGpu",
+	enable_wayland = false,
 
 	-- Leader key configuration
 	leader = { key = "Space", mods = "CTRL", timeout_milliseconds = 500 },
