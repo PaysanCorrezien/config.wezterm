@@ -11,6 +11,7 @@ local M = {
 	-- enable_wayland = true,
 	front_end = "WebGpu",
 	enable_wayland = false,
+	enable_kitty_keyboard = true,
 
 	-- Leader key configuration
 	leader = { key = "Space", mods = "CTRL", timeout_milliseconds = 500 },
