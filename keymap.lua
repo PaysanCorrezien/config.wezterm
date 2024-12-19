@@ -326,6 +326,7 @@ M.keys = {
 
 	-- Workspace and pane management
 	{
+		--TODO: make use of resurrect here
 		key = "F",
 		mods = "LEADER",
 		action = workspace_switcher.switch_workspace(),

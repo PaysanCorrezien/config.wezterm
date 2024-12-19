@@ -12,11 +12,11 @@ local M = {
 	front_end = "WebGpu",
 	enable_wayland = false,
 	enable_kitty_keyboard = true,
+	max_fps = 144,
 
 	-- Leader key configuration
 	leader = { key = "Space", mods = "CTRL", timeout_milliseconds = 500 },
 
-	-- Window settings
 	-- window_decorations = "NONE", -- Removes window borders
 	tab_bar_at_bottom = true, -- Places tab bar at bottom
 	window_padding = {
@@ -31,6 +31,17 @@ local M = {
 wez.on("smart_workspace_switcher.workspace_switcher.selected", function(window, path, label)
 	local workspace_state = resurrect.workspace_state
 	resurrect.save_state(workspace_state.get_workspace_state())
+end)
+
+-- loads the state whenever I create a new workspace
+wez.on("smart_workspace_switcher.workspace_switcher.created", function(window, path, label)
+	local workspace_state = resurrect.workspace_state
+	workspace_state.restore_workspace(resurrect.load_state(label, "workspace"), {
+		window = window,
+		relative = true,
+		restore_text = true,
+		on_pane_restore = resurrect.tab_state.default_on_pane_restore,
+	})
 end)
 
 -- Configure auto save every 15 minutes by default
