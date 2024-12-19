@@ -283,14 +283,14 @@ M.keys = {
 	-- Portal teleport bindings
 	{
 		key = "N",
-		mods = "LEADER", -- Changed from ALT to LEADER
+		mods = "LEADER",
 		action = portal.teleport({
 			name = "Notes",
 			action = {
 				args = {
 					"zsh",
 					"-c",
-					"source ~/.zshrc && nvim -c \"lua require('telescope.builtin').find_files({cwd = '/home/dylan/Documents/Notes/', file_ignore_patterns = {'^%.git/'}, find_command = {'rg', '--files', '--type', 'md'}})\"",
+					"source ~/.zshrc && nvim -c \"lua require('fzf-lua').files({cwd = '/home/dylan/Documents/Notes/', cmd = 'rg --files --type md', prompt = 'Notes> '})\"",
 				},
 				cwd = "/home/dylan/Documents/Notes/",
 				env = { EDITOR = "nvim" },
@@ -299,14 +299,14 @@ M.keys = {
 	},
 	{
 		key = "n",
-		mods = "LEADER", -- Changed from CTRL|ALT to LEADER
+		mods = "LEADER",
 		action = portal.teleport({
 			name = "NixOs",
 			action = {
 				args = {
 					"zsh",
 					"-c",
-					"source ~/.zshrc && nvim -c \"lua require('telescope.builtin').find_files({cwd = '/home/dylan/.config/nix/', file_ignore_patterns = {'^%.git/'}})\"",
+					"source ~/.zshrc && nvim -c \"lua require('fzf-lua').files({cwd = '/home/dylan/.config/nix/', prompt = 'NixOS> '})\"",
 				},
 				cwd = "/home/dylan/.config/nix/",
 			},
