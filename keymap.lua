@@ -119,6 +119,109 @@ M.keys = {
 	},
 	{
 		key = "Tab",
+		mods = "LEADER",
+		action = wezterm.action_callback(function(window, pane)
+			-- Get current pane text
+			local text = pane:get_lines_as_text(pane:get_dimensions().scrollback_rows)
+			wezterm.log_info("Got pane text")
+
+			-- Create a temporary file for the processed text
+			local name = os.tmpname()
+			local f = io.open(name, "w+")
+
+			-- Use a set to track unique entries
+			local seen = {}
+			local unique_entries = {}
+
+			-- Helper function to add unique entries
+			local function add_unique(entry)
+				if not seen[entry] then
+					seen[entry] = true
+					table.insert(unique_entries, entry)
+				end
+			end
+
+			-- Process lines, skip empty lines and duplicates
+			for line in text:gmatch("[^\r\n]+") do
+				local trimmed = line:match("^%s*(.-)%s*$") -- Trim whitespace
+				if #trimmed > 0 then -- Skip empty lines
+					add_unique(trimmed)
+				end
+
+				-- Split line into words and word pairs
+				local words = {}
+				for word in line:gmatch("%S+") do
+					table.insert(words, word)
+				end
+
+				-- Add significant words (longer than 3 chars)
+				for _, word in ipairs(words) do
+					if #word > 3 then
+						add_unique(word)
+					end
+				end
+
+				-- Add word pairs
+				for i = 1, #words - 1 do
+					local pair = words[i] .. " " .. words[i + 1]
+					if #pair > 7 then -- Only add meaningful pairs
+						add_unique(pair)
+					end
+				end
+			end
+
+			-- Write unique entries to file
+			f:write(table.concat(unique_entries, "\n"))
+			f:flush()
+			f:close()
+
+			-- Create new floating pane with fzf
+			local current_pane_id = pane:pane_id()
+			local command = string.format(
+				[[
+            #!/bin/bash
+            selected_text=$(cat %s | fzf \
+                --multi \
+                --height=80%% \
+                --layout=reverse \
+                --border \
+                --preview 'echo {}' \
+                --preview-window=up:3:wrap \
+                --header="Select text (TAB for multi-select)")
+            if [ -n "$selected_text" ]; then
+                wezterm cli activate-pane --pane-id %s
+                wezterm cli send-text --pane-id %s -- "$selected_text"
+            fi
+        ]],
+				name,
+				current_pane_id,
+				current_pane_id
+			)
+
+			-- Save the command to a temporary script
+			local script_name = os.tmpname()
+			local script = io.open(script_name, "w+")
+			script:write(command)
+			script:flush()
+			script:close()
+			os.execute("chmod +x " .. script_name)
+
+			-- Run the script in a floating pane
+			window:perform_action(
+				wezterm.action.SpawnCommandInNewFloatingPane({
+					args = { "bash", script_name },
+				}),
+				pane
+			)
+
+			-- Cleanup after a delay
+			wezterm.sleep_ms(1000)
+			os.remove(name)
+			os.remove(script_name)
+		end),
+	},
+	{
+		key = "Tab",
 		mods = "CTRL",
 		action = act.ActivateTabRelative(1),
 	},

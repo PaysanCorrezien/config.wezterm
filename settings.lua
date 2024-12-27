@@ -19,6 +19,8 @@ local M = {
 
 	-- window_decorations = "NONE", -- Removes window borders
 	tab_bar_at_bottom = true, -- Places tab bar at bottom
+
+	--NOTE: https://github.com/wez/wezterm/pull/5576
 	window_padding = {
 		left = 0,
 		right = 0,
