@@ -25,6 +25,23 @@ local M = {
 		top = 0,
 		bottom = 0,
 	},
+	floating_pane_padding = {
+		left = "5%",
+		right = "5%",
+		top = "10%",
+		bottom = "10%",
+	},
+
+	floating_pane_border = {
+		left_width = "0.2cell",
+		right_width = "0.2cell",
+		bottom_height = "0.10cell",
+		top_height = "0.10cell",
+		left_color = "#c4a7e7",
+		right_color = "#c4a7e7",
+		bottom_color = "#c4a7e7",
+		top_color = "#c4a7e7",
+	},
 }
 
 -- Saves the state whenever I select a workspace

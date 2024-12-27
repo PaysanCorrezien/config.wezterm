@@ -1,5 +1,6 @@
 -- keymap.lua
 local wez = require("wezterm")
+local wezterm = require("wezterm")
 local act = wez.action
 
 -- Plugin imports
@@ -37,11 +38,85 @@ else
 	workspace_manager = wez.plugin.require("https://github.com/paysancorrezien/workspace_manager.wezterm")
 end
 
+local wezterm = require("wezterm")
+local act = wezterm.action
+
 -- Create module table
 local M = {}
 
 -- Define keybindings
 M.keys = {
+	{ key = "`", mods = "CTRL", action = act.ToggleFloatingPane },
+	{
+		key = "g",
+		mods = "LEADER",
+		action = wezterm.action_callback(function(window, pane)
+			-- First check if we're already in a lazygit pane
+			local current_title = pane:get_title()
+			if current_title:match("lazygit") then
+				wezterm.log_info("Currently in lazygit pane, just toggle floating")
+				window:perform_action(wezterm.action.ToggleFloatingPane, pane)
+				return
+			end
+
+			-- If we're not on lazygit, look for existing lazygit or create new one
+			local success, stdout, stderr = wezterm.run_child_process({
+				"wezterm",
+				"cli",
+				"list",
+			})
+
+			wezterm.log_info("Checking panes")
+
+			if success then
+				local found_lazygit = false
+				local first_line = true
+				for line in stdout:gmatch("[^\r\n]+") do
+					if first_line then
+						first_line = false
+					else
+						local win_id, tab_id, pane_id, workspace, size, title =
+							line:match("(%d+)%s+(%d+)%s+(%d+)%s+([^%s]+)%s+([^%s]+)%s+(%S+)")
+
+						wezterm.log_info(
+							string.format("Found pane - Title: %s, ID: %s", title or "unknown", pane_id or "unknown")
+						)
+
+						if title == "lazygit" then
+							found_lazygit = true
+							wezterm.log_info("Found existing lazygit, activating it")
+							window:perform_action(
+								wezterm.action.Multiple({
+									wezterm.action.ActivatePaneByIndex(tonumber(pane_id)),
+									wezterm.action.ToggleFloatingPane,
+								}),
+								pane
+							)
+							return
+						end
+					end
+				end
+
+				if not found_lazygit then
+					wezterm.log_info("Creating new lazygit")
+					window:perform_action(
+						wezterm.action.SpawnCommandInNewFloatingPane({
+							args = { "zsh", "-c", "lazygit" },
+						}),
+						pane
+					)
+				end
+			else
+				wezterm.log_info("Fallback: creating lazygit")
+				window:perform_action(
+					wezterm.action.SpawnCommandInNewFloatingPane({
+						args = { "zsh", "-c", "lazygit" },
+					}),
+					pane
+				)
+			end
+		end),
+	},
 	{
 		key = "Tab",
 		mods = "CTRL",
