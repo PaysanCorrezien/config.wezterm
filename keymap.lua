@@ -2,10 +2,11 @@
 local wez = require("wezterm")
 local wezterm = require("wezterm")
 local act = wez.action
-
 -- Plugin imports
 local workspace_switcher = wez.plugin.require("https://github.com/MLFlexer/smart_workspace_switcher.wezterm")
 local resurrect = wez.plugin.require("https://github.com/MLFlexer/resurrect.wezterm")
+local platform = require("platform")
+local paths = require("config_paths")
 
 local hostname = wez.hostname()
 local username = os.getenv("USER") or os.getenv("USERNAME")
@@ -20,7 +21,7 @@ local workspace_manager
 
 if username == "dylan" and (hostname == "workstation" or hostname == "lenovo") then
 	-- Set package path for local modules
-	package.path = package.path .. ";/home/dylan/repo/?.wezterm/init.lua"
+	package.path = package.path .. ";" .. platform.join_path(platform.home_dir, "repo", "?.wezterm", "init.lua")
 	-- Local module imports
 	previous_workspace = require("previous_workspace")
 	semantic_zones = require("semantic_zones")
@@ -38,11 +39,19 @@ else
 	workspace_manager = wez.plugin.require("https://github.com/paysancorrezien/workspace_manager.wezterm")
 end
 
-local wezterm = require("wezterm")
-local act = wezterm.action
-
 -- Create module table
 local M = {}
+
+-- Helper function to create platform-agnostic shell command
+local function create_shell_command(cmd)
+	if platform.is_windows then
+		-- Escape backslashes in the command for PowerShell
+		cmd = cmd:gsub("\\", "\\\\")
+		return { "pwsh.exe", "-NoLogo", "-NoProfile", "-Command", cmd }
+	else
+		return { "zsh", "-c", "source " .. paths.shell.rc_file .. " && " .. cmd }
+	end
+end
 
 -- Define keybindings
 M.keys = {
@@ -54,67 +63,20 @@ M.keys = {
 			-- First check if we're already in a lazygit pane
 			local current_title = pane:get_title()
 			if current_title:match("lazygit") then
-				wezterm.log_info("Currently in lazygit pane, just toggle floating")
 				window:perform_action(wezterm.action.ToggleFloatingPane, pane)
 				return
 			end
 
-			-- If we're not on lazygit, look for existing lazygit or create new one
-			local success, stdout, stderr = wezterm.run_child_process({
-				"wezterm",
-				"cli",
-				"list",
-			})
+			-- Create new lazygit pane with platform-specific command
+			local lazygit_cmd = platform.is_windows and { "lazygit.exe" } -- Windows
+				or { "lazygit" } -- Unix-like systems
 
-			wezterm.log_info("Checking panes")
-
-			if success then
-				local found_lazygit = false
-				local first_line = true
-				for line in stdout:gmatch("[^\r\n]+") do
-					if first_line then
-						first_line = false
-					else
-						local win_id, tab_id, pane_id, workspace, size, title =
-							line:match("(%d+)%s+(%d+)%s+(%d+)%s+([^%s]+)%s+([^%s]+)%s+(%S+)")
-
-						wezterm.log_info(
-							string.format("Found pane - Title: %s, ID: %s", title or "unknown", pane_id or "unknown")
-						)
-
-						if title == "lazygit" then
-							found_lazygit = true
-							wezterm.log_info("Found existing lazygit, activating it")
-							window:perform_action(
-								wezterm.action.Multiple({
-									wezterm.action.ActivatePaneByIndex(tonumber(pane_id)),
-									wezterm.action.ToggleFloatingPane,
-								}),
-								pane
-							)
-							return
-						end
-					end
-				end
-
-				if not found_lazygit then
-					wezterm.log_info("Creating new lazygit")
-					window:perform_action(
-						wezterm.action.SpawnCommandInNewFloatingPane({
-							args = { "zsh", "-c", "lazygit" },
-						}),
-						pane
-					)
-				end
-			else
-				wezterm.log_info("Fallback: creating lazygit")
-				window:perform_action(
-					wezterm.action.SpawnCommandInNewFloatingPane({
-						args = { "zsh", "-c", "lazygit" },
-					}),
-					pane
-				)
-			end
+			window:perform_action(
+				wezterm.action.SpawnCommandInNewFloatingPane({
+					args = lazygit_cmd,
+				}),
+				pane
+			)
 		end),
 	},
 	{
@@ -177,39 +139,62 @@ M.keys = {
 
 			-- Create new floating pane with fzf
 			local current_pane_id = pane:pane_id()
-			local command = string.format(
-				[[
-            #!/bin/bash
-            selected_text=$(cat %s | fzf \
-                --multi \
-                --height=80%% \
-                --layout=reverse \
-                --border \
-                --preview 'echo {}' \
-                --preview-window=up:3:wrap \
-                --header="Select text (TAB for multi-select)")
-            if [ -n "$selected_text" ]; then
-                wezterm cli activate-pane --pane-id %s
-                wezterm cli send-text --pane-id %s -- "$selected_text"
-            fi
-        ]],
-				name,
-				current_pane_id,
-				current_pane_id
-			)
 
-			-- Save the command to a temporary script
-			local script_name = os.tmpname()
+			-- Platform-specific script content
+			local script_content
+			if platform.is_windows then
+				script_content = string.format(
+					[[
+$selected_text = Get-Content %s | fzf --multi --height=80%% --layout=reverse --border --preview 'echo {}' --preview-window=up:3:wrap --header='Select text (TAB for multi-select)'
+if ($selected_text) {
+    wezterm cli activate-pane --pane-id %s
+    wezterm cli send-text --pane-id %s -- $selected_text
+}]],
+					name,
+					current_pane_id,
+					current_pane_id
+				)
+			else
+				script_content = string.format(
+					[[
+selected_text=$(cat %s | fzf \
+    --multi \
+    --height=80%% \
+    --layout=reverse \
+    --border \
+    --preview 'echo {}' \
+    --preview-window=up:3:wrap \
+    --header="Select text (TAB for multi-select)")
+if [ -n "$selected_text" ]; then
+    wezterm cli activate-pane --pane-id %s
+    wezterm cli send-text --pane-id %s -- "$selected_text"
+fi]],
+					name,
+					current_pane_id,
+					current_pane_id
+				)
+			end
+
+			-- Save the script with platform-appropriate extension
+			local script_ext = platform.is_windows and ".ps1" or ".sh"
+			local script_name = os.tmpname() .. script_ext
 			local script = io.open(script_name, "w+")
-			script:write(command)
+			script:write(script_content)
 			script:flush()
 			script:close()
-			os.execute("chmod +x " .. script_name)
 
-			-- Run the script in a floating pane
+			-- Make script executable on Unix systems
+			if not platform.is_windows then
+				os.execute("chmod +x " .. script_name)
+			end
+
+			-- Run the script in a floating pane with platform-appropriate shell
+			local shell_cmd = platform.is_windows and { "pwsh.exe", "-NoLogo", "-NoProfile", "-File", script_name }
+				or { "bash", script_name }
+
 			window:perform_action(
 				wezterm.action.SpawnCommandInNewFloatingPane({
-					args = { "bash", script_name },
+					args = shell_cmd,
 				}),
 				pane
 			)
@@ -465,13 +450,16 @@ M.keys = {
 		action = portal.teleport({
 			name = "Notes",
 			action = {
-				args = {
-					"zsh",
-					"-c",
-					"source ~/.zshrc && nvim -c \"lua require('fzf-lua').files({cwd = '/home/dylan/Documents/Notes/', cmd = 'rg --files --type md', prompt = 'Notes> '})\"",
-				},
-				cwd = "/home/dylan/Documents/Notes/",
-				env = { EDITOR = "nvim" },
+				args = create_shell_command(
+					string.format(
+						"%s -c \"lua require('fzf-lua').files({cwd = [[%s]], cmd = [[%s]], prompt = 'Notes> '})\"",
+						paths.commands.editor,
+						paths.apps.notes,
+						paths.commands.file_search
+					)
+				),
+				cwd = paths.apps.notes,
+				env = { EDITOR = paths.commands.editor },
 			},
 		}),
 	},
@@ -479,25 +467,27 @@ M.keys = {
 		key = "n",
 		mods = "LEADER",
 		action = portal.teleport({
-			name = "NixOs",
+			name = "Config",
 			action = {
-				args = {
-					"zsh",
-					"-c",
-					"source ~/.zshrc && nvim -c \"lua require('fzf-lua').files({cwd = '/home/dylan/.config/nix/', prompt = 'NixOS> '})\"",
-				},
-				cwd = "/home/dylan/.config/nix/",
+				args = create_shell_command(
+					string.format(
+						"%s -c \"lua require('fzf-lua').files({cwd = [[%s]], prompt = 'Config> '})\"",
+						paths.commands.editor,
+						paths.apps.config
+					)
+				),
+				cwd = paths.apps.config,
 			},
 		}),
 	},
 	{
 		key = ".",
-		mods = "LEADER", -- Changed from ALT to LEADER
+		mods = "LEADER",
 		action = portal.teleport({
 			name = "Music",
 			action = {
-				args = { "termusic" },
-				cwd = "/home/dylan/Musique/",
+				args = paths.commands.music_player,
+				cwd = paths.apps.music,
 			},
 		}),
 	},
